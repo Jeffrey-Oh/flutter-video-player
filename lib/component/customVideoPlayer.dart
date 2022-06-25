@@ -6,8 +6,11 @@ import 'package:video_player/video_player.dart';
 
 class CustomVideoPlayer extends StatefulWidget {
   final XFile video;
+  final VoidCallback onNewVideoPressed;
 
-  const CustomVideoPlayer({required this.video, Key? key}) : super(key: key);
+  const CustomVideoPlayer(
+      {required this.video, required this.onNewVideoPressed, Key? key})
+      : super(key: key);
 
   @override
   State<CustomVideoPlayer> createState() => _CustomVideoPlayerState();
@@ -16,6 +19,7 @@ class CustomVideoPlayer extends StatefulWidget {
 class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
   VideoPlayerController? videoPlayerController;
   Duration currentPosition = Duration();
+  bool showControls = false;
 
   @override
   void initState() {
@@ -24,7 +28,22 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
     initializeController();
   }
 
+  /// state full widget 이 실행되어 있으나
+  /// 파라미터 값만 변경된 경우에 didUpdateWidget 으로 처리
+  @override
+  void didUpdateWidget(covariant CustomVideoPlayer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.video.path != widget.video.path) {
+      initializeController();
+    }
+  }
+
   initializeController() async {
+    /// 새로운 영상을 보는 경우에는 처음부터 봐야하기 때문에
+    /// 영상 교체를 했다는 가정하에 초기 값을 0으로 세팅
+    currentPosition = Duration();
+
     videoPlayerController = VideoPlayerController.file(
       File(widget.video.path),
     );
@@ -51,26 +70,36 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
     return AspectRatio(
       // 영상 비율에 맞게 재조정
       aspectRatio: videoPlayerController!.value.aspectRatio,
-      child: Stack(
-        children: [
-          VideoPlayer(
-            videoPlayerController!,
-          ),
-          _Controls(
-            onReversePressed: onReversePressed,
-            onPlayPressed: onPlayPressed,
-            onForwardPressed: onForwardPressed,
-            isPlaying: videoPlayerController!.value.isPlaying,
-          ),
-          _NewVideo(
-            onPressed: onNewVideoPressed,
-          ),
-          _SliderBottom(
-            currentPosition: currentPosition,
-            maxPosition: videoPlayerController!.value.duration,
-            onSliderChanged: onSliderChanged,
-          ),
-        ],
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            showControls = !showControls;
+          });
+        },
+        child: Stack(
+          children: [
+            VideoPlayer(
+              videoPlayerController!,
+            ),
+            if (showControls)
+              _Controls(
+                onReversePressed: onReversePressed,
+                onPlayPressed: onPlayPressed,
+                onForwardPressed: onForwardPressed,
+                isPlaying: videoPlayerController!.value.isPlaying,
+              ),
+            if (showControls)
+              _NewVideo(
+                onPressed: widget.onNewVideoPressed,
+              ),
+            if (showControls)
+              _SliderBottom(
+                currentPosition: currentPosition,
+                maxPosition: videoPlayerController!.value.duration,
+                onSliderChanged: onSliderChanged,
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -82,8 +111,6 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
       ),
     );
   }
-
-  void onNewVideoPressed() {}
 
   void onReversePressed() {
     final currentPosition = videoPlayerController!.value.position;
@@ -142,8 +169,8 @@ class _Controls extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       color: Colors.black.withOpacity(0.5),
+      height: MediaQuery.of(context).size.height,
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           renderIconButton(
